@@ -615,6 +615,18 @@ impl DnsQuestion {
     }
 }
 
+/// Represents MX record data.
+///
+/// Contains the preference value and exchange server hostname from an MX record.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // This is part of the public API
+pub struct MxData {
+    /// Priority/preference value - lower numbers have higher priority.
+    pub preference: u16,
+    /// The hostname of the mail server.
+    pub exchange: String,
+}
+
 /// Represents a DNS resource record in the answer, authority, or additional sections.
 ///
 /// Resource records contain the actual data returned by DNS servers in response to queries.
@@ -642,6 +654,7 @@ pub struct ResourceRecord {
     /// The type of this resource record (A, AAAA, CNAME, etc.).
     pub rtype: QueryType,
     /// The record class, typically 1 for Internet (IN) class.
+    #[allow(dead_code)] // Used by get_class() method
     pub rclass: u16,
     /// Time-to-live in seconds - how long this record can be cached.
     pub ttl: u32,
@@ -695,6 +708,7 @@ pub enum RData {
         /// The numeric DNS record type code.
         rtype: u16,
         /// The raw record data as received from the server.
+        #[allow(dead_code)] // Used by get_raw_data() method
         data: Vec<u8>,
     },
 }
@@ -726,6 +740,163 @@ impl fmt::Display for RData {
 }
 
 impl ResourceRecord {
+    /// Gets the IPv4 address from an A record.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(Ipv4Addr)` - The IPv4 address if this is an A record
+    /// * `None` - If this is not an A record
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use dns_resolver::dns::{ResourceRecord, QueryType, RData};
+    /// use std::net::Ipv4Addr;
+    ///
+    /// let record = ResourceRecord {
+    ///     name: "example.com".to_string(),
+    ///     rtype: QueryType::A,
+    ///     rclass: 1,
+    ///     ttl: 300,
+    ///     data: RData::A(Ipv4Addr::new(192, 0, 2, 1)),
+    /// };
+    ///
+    /// if let Some(ip) = record.get_ipv4_address() {
+    ///     println!("IP address: {}", ip);
+    /// }
+    /// ```
+    #[allow(dead_code)] // Public API method
+    pub fn get_ipv4_address(&self) -> Option<std::net::Ipv4Addr> {
+        match &self.data {
+            RData::A(addr) => Some(*addr),
+            _ => None,
+        }
+    }
+
+    /// Gets the IPv6 address from an AAAA record.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(Ipv6Addr)` - The IPv6 address if this is an AAAA record
+    /// * `None` - If this is not an AAAA record
+    #[allow(dead_code)] // Public API method
+    pub fn get_ipv6_address(&self) -> Option<std::net::Ipv6Addr> {
+        match &self.data {
+            RData::AAAA(addr) => Some(*addr),
+            _ => None,
+        }
+    }
+
+    /// Gets the MX record data.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(MxData)` - The MX record data if this is an MX record
+    /// * `None` - If this is not an MX record
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use dns_resolver::dns::{ResourceRecord, QueryType, RData};
+    ///
+    /// let record = ResourceRecord {
+    ///     name: "example.com".to_string(),
+    ///     rtype: QueryType::MX,
+    ///     rclass: 1,
+    ///     ttl: 3600,
+    ///     data: RData::MX {
+    ///         preference: 10,
+    ///         exchange: "mail.example.com".to_string(),
+    ///     },
+    /// };
+    ///
+    /// if let Some(mx_data) = record.get_mx_data() {
+    ///     println!("Mail server: {} (priority: {})", mx_data.exchange, mx_data.preference);
+    /// }
+    /// ```
+    #[allow(dead_code)] // Public API method
+    pub fn get_mx_data(&self) -> Option<MxData> {
+        match &self.data {
+            RData::MX {
+                preference,
+                exchange,
+            } => Some(MxData {
+                preference: *preference,
+                exchange: exchange.clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Gets the CNAME target from a CNAME record.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(String)` - The canonical name if this is a CNAME record
+    /// * `None` - If this is not a CNAME record
+    #[allow(dead_code)] // Public API method
+    pub fn get_cname(&self) -> Option<&str> {
+        match &self.data {
+            RData::CNAME(name) => Some(name),
+            _ => None,
+        }
+    }
+
+    /// Gets the text content from a TXT record.
+    ///
+    /// # Returns
+    ///
+    /// * `Some(String)` - The text content if this is a TXT record
+    /// * `None` - If this is not a TXT record
+    #[allow(dead_code)] // Public API method
+    pub fn get_txt_data(&self) -> Option<&str> {
+        match &self.data {
+            RData::TXT(text) => Some(text),
+            _ => None,
+        }
+    }
+
+    /// Gets the record class.
+    ///
+    /// # Returns
+    ///
+    /// The record class value. Typically 1 for Internet (IN) class.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use dns_resolver::dns::{ResourceRecord, QueryType, RData};
+    /// use std::net::Ipv4Addr;
+    ///
+    /// let record = ResourceRecord {
+    ///     name: "example.com".to_string(),
+    ///     rtype: QueryType::A,
+    ///     rclass: 1, // IN class
+    ///     ttl: 300,
+    ///     data: RData::A(Ipv4Addr::new(192, 0, 2, 1)),
+    /// };
+    ///
+    /// assert_eq!(record.get_class(), 1); // Internet class
+    /// ```
+    #[allow(dead_code)] // Public API method
+    pub fn get_class(&self) -> u16 {
+        self.rclass
+    }
+
+    /// Gets raw data from unsupported record types.
+    ///
+    /// # Returns
+    ///
+    /// * `Some((rtype, data))` - The record type code and raw data if this is an unsupported record type
+    /// * `None` - If this is a supported record type
+    #[allow(dead_code)] // Public API method
+    pub fn get_raw_data(&self) -> Option<(u16, &[u8])> {
+        match &self.data {
+            RData::Other { rtype, data } => Some((*rtype, data)),
+            _ => None,
+        }
+    }
+
     /// Deserializes a DNS resource record from a byte cursor.
     ///
     /// Reads a complete resource record from the cursor in DNS wire format, including
