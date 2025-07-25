@@ -1398,7 +1398,6 @@ pub fn unpack_domain_name(cursor: &mut Cursor<&[u8]>) -> Result<String, std::io:
     let mut parts = Vec::new();
     let mut jumped = false;
     let mut jump_pos = 0;
-    let initial_pos = cursor.position();
 
     loop {
         let mut len_buf = [0u8; 1];
@@ -1407,7 +1406,7 @@ pub fn unpack_domain_name(cursor: &mut Cursor<&[u8]>) -> Result<String, std::io:
 
         if (len & 0b1100_0000) == 0b1100_0000 {
             if !jumped {
-                jump_pos = cursor.position() + 1; // Save position after the pointer.
+                jump_pos = cursor.position() + 1; // Save position after the pointer (2 bytes total).
                 jumped = true;
             }
 
@@ -1416,7 +1415,7 @@ pub fn unpack_domain_name(cursor: &mut Cursor<&[u8]>) -> Result<String, std::io:
             cursor.read_exact(&mut offset_buf)?;
             let offset = (((len & 0x3F) as u16) << 8) | (offset_buf[0] as u16);
 
-            // Move cursor to the offset, read the name, then jump back.
+            // Move cursor to the offset, read the name, then continue reading from there.
             cursor.set_position(offset as u64);
             continue;
         }
@@ -1430,16 +1429,11 @@ pub fn unpack_domain_name(cursor: &mut Cursor<&[u8]>) -> Result<String, std::io:
         parts.push(String::from_utf8_lossy(&label_buf).to_string());
     }
 
-    // If we jumped, restore the cursor to its position after the pointer.
+    // If we jumped due to compression, restore the cursor to its position after the pointer.
     if jumped {
         cursor.set_position(jump_pos);
-    } else {
-        // If we didn't jump, the cursor is already at the end of the name.
-        // However, if the name was empty (just a null byte), we need to advance past it.
-        if initial_pos == cursor.position() - 1 && parts.is_empty() {
-            // This case handles the root domain "." which is just a single 0x00 byte.
-        }
     }
+    // If we didn't jump, the cursor is already positioned correctly after the null terminator.
 
     Ok(parts.join("."))
 }
@@ -1468,33 +1462,33 @@ mod tests {
         let mut cursor = Cursor::new(&data[..]);
         let name = unpack_domain_name(&mut cursor).unwrap();
         assert_eq!(name, "www.google.com");
-        assert_eq!(cursor.position(), 17); // Check cursor is at the end.
+        assert_eq!(cursor.position(), 16); // Check cursor is at the end.
     }
 
     #[test]
     fn test_unpack_compressed_domain_name() {
         // Sample response data with compression
         // Header (12 bytes)
-        // Question: 03www06google03com00 (17 bytes)
+        // Question: 03www06google03com00 (16 bytes)
         // Answer: c00c (pointer to www.google.com)
         let data = vec![
             // Some dummy data to represent the start of a packet
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, // 12 bytes
             // The name "www.google.com" at offset 12
             3, b'w', b'w', b'w', 6, b'g', b'o', b'o', b'g', b'l', b'e', 3, b'c', b'o', b'm',
-            0, // 17 bytes
+            0, // 16 bytes
             // Some other data
             0xDE, 0xAD, 0xBE, 0xEF, // A pointer `c00c` to offset 12 (0x0c)
             0xc0, 0x0c,
         ];
-        // Start cursor at the pointer (offset 12 + 17 + 4 = 33)
+        // Start cursor at the pointer (offset 12 + 16 + 4 = 32)
         let mut cursor = Cursor::new(&data[..]);
-        cursor.set_position(33);
+        cursor.set_position(32);
 
         let name = unpack_domain_name(&mut cursor).unwrap();
         assert_eq!(name, "www.google.com");
-        // Cursor should be at position 35 (after the 2-byte pointer)
-        assert_eq!(cursor.position(), 35);
+        // Cursor should be at position 34 (after the 2-byte pointer)
+        assert_eq!(cursor.position(), 34);
     }
 
     #[test]
@@ -1510,11 +1504,11 @@ mod tests {
             0x01, b'f', 0xc0, 0x02, // Pointer to offset 2 (where "example" starts)
         ];
         let mut cursor = Cursor::new(&data[..]);
-        cursor.set_position(16); // Start at the second "f"
+        cursor.set_position(15); // Start at the second "f"
 
         let name = unpack_domain_name(&mut cursor).unwrap();
         assert_eq!(name, "f.example.com");
-        assert_eq!(cursor.position(), 20);
+        assert_eq!(cursor.position(), 19);
     }
 
     #[test]
