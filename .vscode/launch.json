@@ -1,0 +1,82 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug dns-resolver",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=dns-resolver",
+                    "--package=dns-resolver"
+                ],
+                "filter": {
+                    "name": "dns-resolver",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "sourceLanguages": [
+                "rust"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug dns-resolver (with args)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=dns-resolver",
+                    "--package=dns-resolver"
+                ],
+                "filter": {
+                    "name": "dns-resolver",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "${input:programArgs}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "sourceLanguages": [
+                "rust"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=dns-resolver",
+                    "--package=dns-resolver"
+                ],
+                "filter": {
+                    "name": "dns-resolver",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "sourceLanguages": [
+                "rust"
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "programArgs",
+            "description": "Enter program arguments",
+            "default": "",
+            "type": "promptString"
+        }
+    ]
+}
